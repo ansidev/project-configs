@@ -1,0 +1,17 @@
+"git-flow for GitHub":
+  - path: ".github/workflows/create_release_pr.yaml"
+    post_message: "You have to add the secret variable GH_TOKEN to your repository settings"
+  - path: ".github/workflows/merge_release_into_develop.yaml"
+    post_message: "You have to add the secret variable GH_TOKEN to your repository settings"
+  - path: ".github/workflows/publish_release.yaml"
+    post_message: "You have to add the secret variable GH_TOKEN to your repository settings"
+  - path: ".github/workflows/rebase.yaml"
+    post_message: "You have to add the secret variable GH_TOKEN to your repository settings"
+".editorconfig":
+  - path: ".editorconfig"
+"renovate.json":
+  - path: "renovate.json"
+    post_message: "You may need to update the base branch."
+"MIT LICENSE":
+  - path: "MIT_LICENSE"
+    post_message: "You need to update the variables current_year and author_name."
