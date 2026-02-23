@@ -23,3 +23,5 @@
 "MIT LICENSE":
   - path: MIT_LICENSE
     post_message: You need to update the variables `current_year` and `author_name`, and rename this file to LICENSE.
+"GitHub Funding":
+  - path: .github/FUNDING.yml
