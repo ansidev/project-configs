@@ -16,24 +16,11 @@ func main() {
 	}
 
 	// Create an interactive text input with single line input mode and show it
-	inputPath, _ := pterm.DefaultInteractiveTextInput.
-		WithDefaultText("1. Project path").
-		Show()
-
-	projectPath, err := convertToFilePath(inputPath)
-
-	if err != nil {
-		pterm.Error.Printf("Failed to input file path: %v\n", err)
-		os.Exit(1)
-	}
+	projectPath := promptProjectPath()
 
 	pterm.Printfln("Normalized file path is %s", pterm.Green(projectPath))
 
-	selectedConfigs, _ := pterm.DefaultInteractiveMultiselect.
-		WithDefaultText("2. Which configurations do you want to copy to your project?").
-		WithOptions(getOptionLabels(configs)).
-		WithFilter(true).
-		Show()
+	selectedConfigs := promptSelectConfigs(getOptionLabels(configs))
 
 	configMetadata := getConfigMetadata(configs, selectedConfigs)
 
@@ -42,9 +29,7 @@ func main() {
 		pterm.Printfln("- %s.", pterm.Green(filepath.Join(BASE_SOURCE_DIR, fileToCopy.Path)))
 	}
 
-	isConfirmed, _ := pterm.DefaultInteractiveConfirm.
-		WithDefaultText("Do you want to proceed?").
-		Show()
+	isConfirmed := promptConfirm("Do you want to proceed?")
 
 	pterm.Println()
 
