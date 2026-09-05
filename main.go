@@ -24,9 +24,16 @@ func main() {
 
 	configMetadata := getConfigMetadata(configs, selectedConfigs)
 
-	pterm.Printfln("Following file will be copied to the project path %s:", pterm.Green(projectPath))
+	pterm.Printfln("Following files will be copied to the project path %s:", pterm.Green(projectPath))
 	for _, fileToCopy := range configMetadata {
-		pterm.Printfln("- %s.", pterm.Green(filepath.Join(BASE_SOURCE_DIR, fileToCopy.Path)))
+		dstPath, err := resolveDestinationPath(projectPath, fileToCopy)
+		if err != nil {
+			pterm.Error.Printfln("Invalid configuration for %s: %v", fileToCopy.Path, err)
+			os.Exit(1)
+		}
+
+		srcPath := filepath.Join(BASE_SOURCE_DIR, fileToCopy.Path)
+		pterm.Printfln("- %s → %s.", pterm.Green(srcPath), pterm.Green(dstPath))
 	}
 
 	isConfirmed := promptConfirm("Do you want to proceed?")
