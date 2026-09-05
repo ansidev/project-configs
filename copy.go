@@ -21,13 +21,13 @@ type CopyEvent struct {
 
 // CopyManager holds the state for file copying operations
 type CopyManager struct {
-	confirmMu sync.Mutex
+	copyMu sync.Mutex
 }
 
 // NewCopyManager creates a new CopyManager with initialized fields
 func NewCopyManager() *CopyManager {
 	return &CopyManager{
-		confirmMu: sync.Mutex{},
+		copyMu: sync.Mutex{},
 	}
 }
 
@@ -95,11 +95,9 @@ func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configMetadata, destDir 
 			// Check if destination file exists
 			if _, err := os.Stat(dst); err == nil {
 				// Lock for confirmation
-				cm.confirmMu.Lock()
-				result, _ := pterm.DefaultInteractiveConfirm.
-					WithDefaultText(fmt.Sprintf("File %s already exists. Overwrite?", dst)).
-					Show()
-				cm.confirmMu.Unlock()
+				cm.copyMu.Lock()
+				result := promptOverwrite(dst)
+				cm.copyMu.Unlock()
 
 				if !result {
 					eventChan <- CopyEvent{SrcPath: src.Path, DestPath: dst, Error: fmt.Errorf("overwrite cancelled by user")}
@@ -129,7 +127,7 @@ func (cm *CopyManager) processCopyEvents(eventChan chan CopyEvent) error {
 
 	for event := range eventChan {
 		// Lock to ensure no active confirmation prompt is in progress
-		cm.confirmMu.Lock()
+		cm.copyMu.Lock()
 		if event.Error != nil {
 			errorCount++
 			pterm.Error.Printfln("Failed to copy %s to %s: %v",
@@ -143,7 +141,7 @@ func (cm *CopyManager) processCopyEvents(eventChan chan CopyEvent) error {
 				successEvents = append(successEvents, event)
 			}
 		}
-		cm.confirmMu.Unlock()
+		cm.copyMu.Unlock()
 	}
 
 	var result error
