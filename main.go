@@ -20,15 +20,15 @@ func main() {
 
 	pterm.Printfln("Normalized file path is %s", pterm.Green(projectPath))
 
-	selectedConfigs := promptSelectConfigs(getOptionLabels(configs))
+	selectedIDs := promptSelectConfigs(getOptionLabels(configs))
 
-	configMetadata := getConfigMetadata(configs, selectedConfigs)
+	selectedResources := getConfigMetadata(configs, selectedIDs)
 
 	pterm.Printfln("Following files will be copied to the project path %s:", pterm.Green(projectPath))
-	for _, fileToCopy := range configMetadata {
+	for _, fileToCopy := range selectedResources {
 		dstPath, err := resolveDestinationPath(projectPath, fileToCopy)
 		if err != nil {
-			pterm.Error.Printfln("Invalid configuration for %s: %v", fileToCopy.Path, err)
+			pterm.Error.Printfln("Invalid configuration for %s (%s): %v", fileToCopy.ID, fileToCopy.Path, err)
 			os.Exit(1)
 		}
 
@@ -45,7 +45,7 @@ func main() {
 		os.Exit(0)
 	}
 	cm := NewCopyManager()
-	err = cm.CopyFilesConcurrently(configMetadata, projectPath)
+	err = cm.CopyFilesConcurrently(selectedResources, projectPath)
 	if err != nil {
 		pterm.Error.Printfln("Error: %v", err)
 		os.Exit(1)

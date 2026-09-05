@@ -10,10 +10,10 @@ import (
 // newTestMultiselect builds the same multiselect used by promptSelectConfigs.
 // The default keymap must be injected explicitly because huh normally does so
 // when the field is wrapped in a form (huh.NewForm).
-func newTestMultiselect(labels []string) *huh.MultiSelect[string] {
+func newTestMultiselect(options []configOption) *huh.MultiSelect[string] {
 	m := huh.NewMultiSelect[string]().
 		Title("2. Which configurations do you want to copy to your project?").
-		Options(newConfigOptions(labels)...).
+		Options(newConfigOptions(options)...).
 		Height(6)
 	field := m.WithKeyMap(huh.NewDefaultKeyMap())
 	updated, ok := field.(*huh.MultiSelect[string])
@@ -50,19 +50,28 @@ func selectedValues(t *testing.T, m *huh.MultiSelect[string]) []string {
 	return got
 }
 
+// testOptions returns config options with distinct labels and ids, mirroring
+// the real config where labels are human-readable and ids are snake_case.
+func testOptions() []configOption {
+	return []configOption{
+		{ID: "git_flow_for_github", Label: "git-flow for GitHub"},
+		{ID: "editorconfig", Label: ".editorconfig"},
+		{ID: "mit_license", Label: "MIT LICENSE"},
+	}
+}
+
 // TestMultiselectSpaceTogglesAndEnterConfirms verifies the core ticket
 // requirement: Space toggles an option without submitting; Enter confirms the
 // selection.
 func TestMultiselectSpaceTogglesAndEnterConfirms(t *testing.T) {
-	labels := []string{"git-flow for GitHub", ".editorconfig", "MIT LICENSE"}
-	m := newTestMultiselect(labels)
+	m := newTestMultiselect(testOptions())
 
 	// Cursor starts on the first option. Space must toggle it, not submit.
 	sendKeys(t, m, keyString(" "))
 
 	selected := selectedValues(t, m)
-	if len(selected) != 1 || selected[0] != "git-flow for GitHub" {
-		t.Fatalf("after Space expected [git-flow for GitHub], got %v", selected)
+	if len(selected) != 1 || selected[0] != "git_flow_for_github" {
+		t.Fatalf("after Space expected [git_flow_for_github], got %v", selected)
 	}
 
 	// Toggling again with Space must deselect (no submission in between).
@@ -78,16 +87,15 @@ func TestMultiselectSpaceTogglesAndEnterConfirms(t *testing.T) {
 		keyString(" "),
 	)
 	selected = selectedValues(t, m)
-	if len(selected) != 1 || selected[0] != "MIT LICENSE" {
-		t.Fatalf("after down,down,Space expected [MIT LICENSE], got %v", selected)
+	if len(selected) != 1 || selected[0] != "mit_license" {
+		t.Fatalf("after down,down,Space expected [mit_license], got %v", selected)
 	}
 }
 
 // TestMultiselectEnterDoesNotToggle verifies Enter confirms/submits and never
 // toggles an option (opposite of the previous pterm behaviour).
 func TestMultiselectEnterDoesNotToggle(t *testing.T) {
-	labels := []string{"a", "b", "c"}
-	m := newTestMultiselect(labels)
+	m := newTestMultiselect(testOptions())
 
 	sendKeys(t, m, tea.KeyMsg{Type: tea.KeyEnter})
 
@@ -100,8 +108,7 @@ func TestMultiselectEnterDoesNotToggle(t *testing.T) {
 // field enters filter mode where Space is typed into the filter (not used to
 // toggle options), and Esc leaves filter mode.
 func TestMultiselectFilterModeSpaceTypesText(t *testing.T) {
-	labels := []string{"git-flow for GitHub", ".editorconfig", "MIT LICENSE"}
-	m := newTestMultiselect(labels)
+	m := newTestMultiselect(testOptions())
 
 	// Enter filter mode.
 	sendKeys(t, m, keyString("/"))
@@ -127,17 +134,17 @@ func TestMultiselectFilterModeSpaceTypesText(t *testing.T) {
 // the option list to matching entries and that after leaving filter mode Space
 // toggles the filtered option.
 func TestMultiselectFilterNarrowsOptions(t *testing.T) {
-	labels := []string{"git-flow for GitHub", ".editorconfig", "MIT LICENSE"}
-	m := newTestMultiselect(labels)
+	m := newTestMultiselect(testOptions())
 
 	sendKeys(t, m, keyString("/"))
 	sendKeys(t, m, keyString("e"), keyString("d"), keyString("i"), keyString("t"))
 	sendKeys(t, m, tea.KeyMsg{Type: tea.KeyEnter})
 
 	// The filtered list must be navigable to the single match and toggleable.
+	// The displayed label is ".editorconfig" but the selected value is its id.
 	sendKeys(t, m, keyString(" "))
-	if got := selectedValues(t, m); len(got) != 1 || got[0] != ".editorconfig" {
-		t.Fatalf("expected [.editorconfig] after filter+Space, got %v", got)
+	if got := selectedValues(t, m); len(got) != 1 || got[0] != "editorconfig" {
+		t.Fatalf("expected [editorconfig] after filter+Space, got %v", got)
 	}
 }
 
@@ -155,6 +162,27 @@ func TestDefaultKeymapDocumentsTicketKeybindings(t *testing.T) {
 	}
 	if !contains(km.MultiSelect.Filter.Keys(), "/") {
 		t.Errorf("MultiSelect.Filter must bind /, got %v", km.MultiSelect.Filter.Keys())
+	}
+}
+
+func TestNewConfigOptionsMapsLabelToID(t *testing.T) {
+	options := []configOption{
+		{ID: "git_flow_for_github", Label: "git-flow for GitHub"},
+		{ID: "mit_license", Label: "MIT LICENSE"},
+	}
+
+	huhOptions := newConfigOptions(options)
+	if len(huhOptions) != len(options) {
+		t.Fatalf("newConfigOptions() returned %d options, want %d", len(huhOptions), len(options))
+	}
+
+	for i, opt := range huhOptions {
+		if opt.Key != options[i].Label {
+			t.Errorf("option %d: displayed key = %q, want label %q", i, opt.Key, options[i].Label)
+		}
+		if opt.Value != options[i].ID {
+			t.Errorf("option %d: value = %q, want id %q", i, opt.Value, options[i].ID)
+		}
 	}
 }
 

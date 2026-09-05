@@ -50,31 +50,32 @@ func promptProjectPath() string {
 	return normalized
 }
 
-// newConfigOptions wraps config labels into huh options so that the
-// multiselect value ([]string) directly contains the config labels.
-func newConfigOptions(labels []string) []huh.Option[string] {
-	options := make([]huh.Option[string], 0, len(labels))
-	for _, label := range labels {
-		options = append(options, huh.NewOption(label, label))
+// newConfigOptions wraps config options into huh options so that the
+// multiselect displays each group's label while the multiselect value
+// ([]string) contains the selected group ids.
+func newConfigOptions(options []configOption) []huh.Option[string] {
+	huhOptions := make([]huh.Option[string], 0, len(options))
+	for _, option := range options {
+		huhOptions = append(huhOptions, huh.NewOption(option.Label, option.ID))
 	}
-	return options
+	return huhOptions
 }
 
 // promptSelectConfigs shows an interactive multiselect where Space toggles an
 // option's selection and Enter confirms the current selection. Pressing "/"
 // enters filter mode; Enter applies the filter and leaves filter mode without
 // submitting; Esc exits filter mode and clears the filter.
-func promptSelectConfigs(labels []string) []string {
+func promptSelectConfigs(options []configOption) []string {
 	var selected []string
 
-	height := len(labels)
+	height := len(options)
 	if height < 6 {
 		height = 6
 	}
 
 	multiselect := huh.NewMultiSelect[string]().
 		Title("2. Which configurations do you want to copy to your project?").
-		Options(newConfigOptions(labels)...).
+		Options(newConfigOptions(options)...).
 		Height(height).
 		Value(&selected)
 

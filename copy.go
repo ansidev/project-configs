@@ -31,7 +31,7 @@ func NewCopyManager() *CopyManager {
 	}
 }
 
-func (cm *CopyManager) copyFile(baseSrcDir string, src configMetadata, dst string, eventChan chan<- CopyEvent) {
+func (cm *CopyManager) copyFile(baseSrcDir string, src configResource, dst string, eventChan chan<- CopyEvent) {
 	// Open source file
 	srcFile, err := os.Open(filepath.Join(baseSrcDir, src.Path))
 	if err != nil {
@@ -75,7 +75,7 @@ func (cm *CopyManager) copyFile(baseSrcDir string, src configMetadata, dst strin
 	eventChan <- CopyEvent{SrcPath: src.Path, DestPath: dst, Error: nil, PostMessage: src.PostMessage}
 }
 
-func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configMetadata, destDir string) error {
+func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configResource, destDir string) error {
 	// Create destination directory if it doesn't exist
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return fmt.Errorf("failed to create destination directory: %v", err)
@@ -88,7 +88,7 @@ func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configMetadata, destDir 
 	for _, src := range srcFiles {
 		wg.Add(1)
 
-		go func(src configMetadata) {
+		go func(src configResource) {
 			defer wg.Done()
 
 			// Resolve the destination path: target overrides the source path when set

@@ -9,23 +9,23 @@ import (
 func TestCopyFilesConcurrently(t *testing.T) {
 	tests := []struct {
 		name         string
-		meta         configMetadata
+		meta         configResource
 		wantFileName string
 		wantSubDir   string
 	}{
 		{
 			name:         "target renames the destination file",
-			meta:         configMetadata{Path: "MIT_LICENSE", Target: "LICENSE", PostMessage: "update the variables"},
+			meta:         configResource{Path: "MIT_LICENSE", Target: "LICENSE", PostMessage: "update the variables"},
 			wantFileName: "LICENSE",
 		},
 		{
 			name:         "no target keeps the source file name",
-			meta:         configMetadata{Path: ".editorconfig"},
+			meta:         configResource{Path: ".editorconfig"},
 			wantFileName: ".editorconfig",
 		},
 		{
 			name:         "target with directory creates the subdirectory",
-			meta:         configMetadata{Path: "renovate.json", Target: ".github/renovate.json"},
+			meta:         configResource{Path: "renovate.json", Target: ".github/renovate.json"},
 			wantFileName: "renovate.json",
 			wantSubDir:   ".github",
 		},
@@ -36,7 +36,7 @@ func TestCopyFilesConcurrently(t *testing.T) {
 			destDir := t.TempDir()
 
 			cm := NewCopyManager()
-			if err := cm.CopyFilesConcurrently([]configMetadata{tt.meta}, destDir); err != nil {
+			if err := cm.CopyFilesConcurrently([]configResource{tt.meta}, destDir); err != nil {
 				t.Fatalf("CopyFilesConcurrently() unexpected error: %v", err)
 			}
 
@@ -68,7 +68,7 @@ func TestCopyFilesConcurrentlyRejectsInvalidPaths(t *testing.T) {
 	destDir := t.TempDir()
 
 	cm := NewCopyManager()
-	err := cm.CopyFilesConcurrently([]configMetadata{{Path: "MIT_LICENSE", Target: "../escaped"}}, destDir)
+	err := cm.CopyFilesConcurrently([]configResource{{Path: "MIT_LICENSE", Target: "../escaped"}}, destDir)
 	if err == nil {
 		t.Fatal("CopyFilesConcurrently() expected error for path-traversal target")
 	}
