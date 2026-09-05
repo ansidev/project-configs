@@ -87,10 +87,16 @@ func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configMetadata, destDir 
 	// Process each file
 	for _, src := range srcFiles {
 		wg.Add(1)
-		dst := filepath.Join(destDir, src.Path)
 
-		go func(src configMetadata, dst string) {
+		go func(src configMetadata) {
 			defer wg.Done()
+
+			// Resolve the destination path: target overrides the source path when set
+			dst, err := resolveDestinationPath(destDir, src)
+			if err != nil {
+				eventChan <- CopyEvent{SrcPath: src.Path, DestPath: src.Target, Error: err}
+				return
+			}
 
 			// Check if destination file exists
 			if _, err := os.Stat(dst); err == nil {
@@ -107,7 +113,7 @@ func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configMetadata, destDir 
 
 			// Proceed with copying
 			cm.copyFile(BASE_SOURCE_DIR, src, dst, eventChan)
-		}(src, dst)
+		}(src)
 	}
 
 	// Close event channel when all copying is done
