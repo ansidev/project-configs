@@ -45,9 +45,10 @@ mit_license:
     - id: mit_license
       path: MIT_LICENSE
       target: LICENSE
-      post_message: You need to update the variables `current_year` and `author_name`.
+      post_message: You need to update the variable `author_name`.
 github_funding:
   label: GitHub Funding
   resources:
     - id: github_funding
       path: .github/FUNDING.yml
+

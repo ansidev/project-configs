@@ -1,11 +1,14 @@
 package main
 
 import (
+	"bytes"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
+	"time"
 
 	"github.com/pterm/pterm"
 )
@@ -50,6 +53,17 @@ func (cm *CopyManager) copyFile(baseSrcDir string, src configResource, dst strin
 		return
 	}
 
+	// Read the template content into memory (template files are small) so
+	// placeholders can be resolved before the destination file is created.
+	content, err := io.ReadAll(srcFile)
+	if err != nil {
+		eventChan <- CopyEvent{SrcPath: src.Path, DestPath: dst, Error: err}
+		return
+	}
+
+	// Resolve supported placeholders (e.g. {current_year}) in the content.
+	content = resolveTemplatePlaceholders(content, templatePlaceholders(time.Now()))
+
 	// Create destination file
 	dstFile, err := os.Create(dst)
 	if err != nil {
@@ -58,8 +72,8 @@ func (cm *CopyManager) copyFile(baseSrcDir string, src configResource, dst strin
 	}
 	defer dstFile.Close()
 
-	// Copy file contents
-	_, err = io.Copy(dstFile, srcFile)
+	// Write the resolved content to the destination file
+	_, err = dstFile.Write(content)
 	if err != nil {
 		eventChan <- CopyEvent{SrcPath: src.Path, DestPath: dst, Error: err}
 		return
@@ -73,6 +87,24 @@ func (cm *CopyManager) copyFile(baseSrcDir string, src configResource, dst strin
 	}
 
 	eventChan <- CopyEvent{SrcPath: src.Path, DestPath: dst, Error: nil, PostMessage: src.PostMessage}
+}
+
+// templatePlaceholders returns the placeholder values that are resolved
+// automatically from the given time when a template file is copied.
+func templatePlaceholders(now time.Time) map[string]string {
+	return map[string]string{
+		"current_year": strconv.Itoa(now.Year()),
+	}
+}
+
+// resolveTemplatePlaceholders replaces every occurrence of each supported
+// `{name}` placeholder in the template content with its resolved value.
+// Placeholders without a matching value are left untouched.
+func resolveTemplatePlaceholders(content []byte, values map[string]string) []byte {
+	for name, value := range values {
+		content = bytes.ReplaceAll(content, []byte("{"+name+"}"), []byte(value))
+	}
+	return content
 }
 
 func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configResource, destDir string) error {
