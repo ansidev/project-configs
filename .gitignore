@@ -1,8 +1,4 @@
-
-
-# [epiq]: local hydrated state is never committed
-.epiq/events/
-.epiq/log/
+.DS_Store
 .claude/skills/open-knowledge/
 .cursor/skills/open-knowledge/
 .codex/skills/open-knowledge/

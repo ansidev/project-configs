@@ -118,6 +118,11 @@ func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configResource, destDir 
 
 	// Process each file
 	for _, src := range srcFiles {
+		// Skip resources with empty paths (like gitflow_init)
+		if src.Path == "" {
+			continue
+		}
+
 		wg.Add(1)
 
 		go func(src configResource) {

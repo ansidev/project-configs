@@ -46,9 +46,20 @@ mit_license:
       path: MIT_LICENSE
       target: LICENSE
       post_message: You need to update the variable `author_name`.
+agpl_v3_license:
+  label: AGPL v3 LICENSE
+  resources:
+    - id: agpl_v3_license
+      path: AGPL_v3_LICENSE
+      target: LICENSE
+gitflow_init:
+  label: Initialize GitFlow
+  resources:
+    - id: gitflow_init
+      path: ""
+      post_message: GitFlow has been initialized for your project.
 github_funding:
   label: GitHub Funding
   resources:
     - id: github_funding
       path: .github/FUNDING.yml
-

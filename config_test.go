@@ -75,6 +75,12 @@ func TestResolveDestinationPath(t *testing.T) {
 			meta:      configResource{Path: "MIT_LICENSE", Target: "   "},
 			wantError: true,
 		},
+		{
+			name:      "empty path returns destDir for action resources",
+			destDir:   "/tmp/project",
+			meta:      configResource{Path: ""},
+			want:      "/tmp/project",
+		},
 	}
 
 	for _, tt := range tests {
@@ -194,6 +200,7 @@ func TestLoadConfig(t *testing.T) {
 		"renovate_json":       "renovate.json",
 		"mit_license":         "MIT LICENSE",
 		"github_funding":      "GitHub Funding",
+		"gitflow_init":        "Initialize GitFlow",
 	}
 	for groupID, label := range wantLabels {
 		group, ok := configs[groupID]

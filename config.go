@@ -129,10 +129,16 @@ func getConfigMetadata(configs map[string]configGroup, selectedIDs []string) []c
 // inside destDir. When the resource specifies a target, the target replaces the
 // source path (including any directory components). Otherwise the source path
 // is used as-is.
+// For action-type resources (like gitflow_init) with empty paths, return the destDir.
 func resolveDestinationPath(destDir string, resource configResource) (string, error) {
 	relPath := resource.Path
 	if resource.Target != "" {
 		relPath = resource.Target
+	}
+
+	// Skip validation for empty paths (action-type resources)
+	if relPath == "" {
+		return destDir, nil
 	}
 
 	if err := validateRelativePath(relPath); err != nil {
