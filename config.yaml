@@ -10,9 +10,6 @@ git_flow_for_github:
     - id: publish_release
       path: .github/workflows/publish_release.yaml
       post_message: You have to add the secret variable GH_TOKEN to your repository settings
-    - id: rebase
-      path: .github/workflows/rebase.yaml
-      post_message: You have to add the secret variable GH_TOKEN to your repository settings
 changelog_generator:
   label: changelog generator
   resources:
