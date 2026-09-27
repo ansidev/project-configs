@@ -69,15 +69,7 @@ func main() {
 	}
 
 	// Separate gitflow_init from regular file copying
-	var regularResources []configResource
-	var hasGitFlowInit bool
-	for _, resource := range selectedResources {
-		if resource.ID == "gitflow_init" {
-			hasGitFlowInit = true
-		} else {
-			regularResources = append(regularResources, resource)
-		}
-	}
+	gitFlowResource, regularResources := splitGitFlowResource(selectedResources)
 
 	// Copy regular files first
 	if len(regularResources) > 0 {
@@ -89,14 +81,36 @@ func main() {
 		}
 	}
 
-	// Handle GitFlow initialization if selected
-	if hasGitFlowInit {
-		err = GitFlowInit(projectPath)
+	// Handle GitFlow initialization last, so that the generated files end up in
+	// the initial commit
+	if gitFlowResource != nil {
+		err = GitFlowInit(projectPath, gitFlowResource.CommitMessage)
 		if err != nil {
 			pterm.Error.Printfln("Error initializing GitFlow: %v", err)
 			os.Exit(1)
 		}
 	}
+}
+
+// splitGitFlowResource separates the GitFlow action resource from the file
+// resources, preserving the order of the file resources. The GitFlow step must
+// run after every file has been copied, so it is returned instead of being
+// kept in the list. At most one GitFlow resource is returned, even when the
+// selection contains more than one.
+func splitGitFlowResource(resources []configResource) (gitFlowResource *configResource, fileResources []configResource) {
+	for _, resource := range resources {
+		if resource.ID == gitFlowResourceID {
+			if gitFlowResource == nil {
+				actionResource := resource
+				gitFlowResource = &actionResource
+			}
+			continue
+		}
+
+		fileResources = append(fileResources, resource)
+	}
+
+	return gitFlowResource, fileResources
 }
 
 // printHelp displays usage information for the CLI

@@ -15,10 +15,15 @@ import (
 )
 
 type configResource struct {
-	ID          string `yaml:"id"`
-	Path        string `yaml:"path"`
-	Target      string `yaml:"target,omitempty"`
+	ID   string `yaml:"id"`
+	Path string `yaml:"path"`
+	// Target overrides the destination file name of the copied resource.
+	Target string `yaml:"target,omitempty"`
+	// PostMessage is printed after the resource has been copied.
 	PostMessage string `yaml:"post_message"`
+	// CommitMessage overrides the message of the commit created by the
+	// gitflow_init action resource. It is ignored by file resources.
+	CommitMessage string `yaml:"commit_message,omitempty"`
 }
 
 type configGroup struct {

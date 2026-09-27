@@ -54,6 +54,7 @@ gitflow_init:
   resources:
     - id: gitflow_init
       path: ""
+      commit_message: "chore: initial commit"
       post_message: GitFlow has been initialized for your project.
 github_funding:
   label: GitHub Funding
