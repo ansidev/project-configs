@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -326,6 +327,195 @@ func TestLoadConfigValidation(t *testing.T) {
 				t.Fatalf("loadConfig() expected error for content:\n%s", tt.content)
 			}
 		})
+	}
+}
+
+// newTestConfigs returns configs with a single group holding the given
+// resources, for use in validateSourceFiles tests.
+func newTestConfigs(resources ...configResource) map[string]configGroup {
+	return map[string]configGroup{
+		"editorconfig": {
+			Label:     ".editorconfig",
+			Resources: resources,
+		},
+	}
+}
+
+// TestValidateSourceFilesAccepts verifies that a config whose source files all
+// exist under the config directory passes validation, including nested paths
+// that resolve through intermediate directories.
+func TestValidateSourceFilesAccepts(t *testing.T) {
+	sourceDir := t.TempDir()
+	for _, path := range []string{"renovate.json", ".editorconfig", ".chglog/config.yml"} {
+		full := filepath.Join(sourceDir, path)
+		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
+			t.Fatalf("failed to create directory for %s: %v", path, err)
+		}
+		if err := os.WriteFile(full, []byte("content"), 0o644); err != nil {
+			t.Fatalf("failed to create source file %s: %v", path, err)
+		}
+	}
+
+	configs := newTestConfigs(
+		configResource{ID: "renovate", Path: "renovate.json"},
+		configResource{ID: "editorconfig", Path: ".editorconfig"},
+		configResource{ID: "chglog", Path: ".chglog/config.yml"},
+	)
+
+	if err := validateSourceFiles(configs, sourceDir); err != nil {
+		t.Errorf("validateSourceFiles() unexpected error: %v", err)
+	}
+}
+
+// TestValidateSourceFilesRejects verifies that an unusable source path is
+// reported with enough detail to identify the config.yaml line to fix: the
+// group id, the resource id and the resolved path.
+func TestValidateSourceFilesRejects(t *testing.T) {
+	sourceDir := t.TempDir()
+	// A directory in place of a file is a different defect from a missing file
+	// and must be described differently.
+	if err := os.MkdirAll(filepath.Join(sourceDir, "chglog"), 0o755); err != nil {
+		t.Fatalf("failed to create directory: %v", err)
+	}
+
+	tests := []struct {
+		name     string
+		resource configResource
+		wantErr  []string
+	}{
+		{
+			name:     "missing file is reported",
+			resource: configResource{ID: "renovate", Path: "renovate.json"},
+			wantErr:  []string{"group \"editorconfig\"", "resource \"renovate\"", "renovate.json", "does not exist"},
+		},
+		{
+			name:     "missing file in a nested directory is reported",
+			resource: configResource{ID: "chglog", Path: ".chglog/config.yml"},
+			wantErr:  []string{"group \"editorconfig\"", "resource \"chglog\"", filepath.Join(".chglog", "config.yml"), "does not exist"},
+		},
+		{
+			name:     "directory in place of a file is reported as not a regular file",
+			resource: configResource{ID: "chglog", Path: "chglog"},
+			wantErr:  []string{"resource \"chglog\"", "is not a regular file"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateSourceFiles(newTestConfigs(tt.resource), sourceDir)
+			if err == nil {
+				t.Fatalf("validateSourceFiles() expected error for path %q, got nil", tt.resource.Path)
+			}
+			for _, want := range tt.wantErr {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("validateSourceFiles() error = %q, want it to contain %q", err.Error(), want)
+				}
+			}
+			if !strings.Contains(err.Error(), sourceDir) {
+				t.Errorf("validateSourceFiles() error = %q, want it to contain the resolved source dir %q", err.Error(), sourceDir)
+			}
+		})
+	}
+}
+
+// TestValidateSourceFilesSkipsActionResources verifies that resources with an
+// empty path, such as gitflow_init, are not treated as missing files: they
+// copy nothing and reference no source.
+func TestValidateSourceFilesSkipsActionResources(t *testing.T) {
+	configs := map[string]configGroup{
+		"gitflow_init": {
+			Label: "Initialize GitFlow",
+			Resources: []configResource{
+				{ID: "gitflow_init", Path: "", PostMessage: "GitFlow has been initialized for your project."},
+			},
+		},
+	}
+
+	if err := validateSourceFiles(configs, t.TempDir()); err != nil {
+		t.Errorf("validateSourceFiles() unexpected error for an action resource: %v", err)
+	}
+}
+
+// TestValidateSourceFilesReportsEveryProblem verifies that all unusable paths
+// are reported in one pass, so the user does not have to fix them one run at a
+// time.
+func TestValidateSourceFilesReportsEveryProblem(t *testing.T) {
+	sourceDir := t.TempDir()
+	configs := map[string]configGroup{
+		"changelog_generator": {
+			Label: "changelog generator",
+			Resources: []configResource{
+				{ID: "chglog_config", Path: ".chglog/config.yml"},
+				{ID: "changelog_template", Path: ".chglog/CHANGELOG.tpl.md"},
+			},
+		},
+		"editorconfig": {
+			Label:     ".editorconfig",
+			Resources: []configResource{{ID: "editorconfig", Path: ".editorconfig"}},
+		},
+	}
+
+	err := validateSourceFiles(configs, sourceDir)
+	if err == nil {
+		t.Fatal("validateSourceFiles() expected error for missing source files, got nil")
+	}
+	for _, want := range []string{"chglog_config", "changelog_template", "editorconfig"} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("validateSourceFiles() error = %q, want it to report resource %q", err.Error(), want)
+		}
+	}
+}
+
+// TestValidateSourceFilesOrderIsDeterministic verifies that problems are
+// reported in a stable order. Go randomises map iteration, so without sorting
+// the group ids the same broken config would produce a different message on
+// every run.
+func TestValidateSourceFilesOrderIsDeterministic(t *testing.T) {
+	sourceDir := t.TempDir()
+	configs := map[string]configGroup{
+		"changelog_generator": {Label: "changelog generator", Resources: []configResource{{ID: "chglog_config", Path: ".chglog/config.yml"}}},
+		"editorconfig":        {Label: ".editorconfig", Resources: []configResource{{ID: "editorconfig", Path: ".editorconfig"}}},
+		"mit_license":         {Label: "MIT LICENSE", Resources: []configResource{{ID: "mit_license", Path: "MIT_LICENSE"}}},
+		"renovate_json":       {Label: "renovate.json", Resources: []configResource{{ID: "renovate_json", Path: "renovate.json"}}},
+	}
+
+	first := validateSourceFiles(configs, sourceDir)
+	if first == nil {
+		t.Fatal("validateSourceFiles() expected error for missing source files, got nil")
+	}
+	for i := 0; i < 20; i++ {
+		if got := validateSourceFiles(configs, sourceDir); got.Error() != first.Error() {
+			t.Fatalf("validateSourceFiles() error is not deterministic:\nfirst: %q\n  got: %q", first.Error(), got.Error())
+		}
+	}
+
+	// Group ids are reported sorted, resources in file order.
+	wantOrder := []string{"changelog_generator", "editorconfig", "mit_license", "renovate_json"}
+	previous := -1
+	for _, groupID := range wantOrder {
+		index := strings.Index(first.Error(), groupID)
+		if index == -1 {
+			t.Fatalf("validateSourceFiles() error = %q, want it to mention group %q", first.Error(), groupID)
+		}
+		if index < previous {
+			t.Errorf("validateSourceFiles() error = %q, want group %q reported in sorted order", first.Error(), groupID)
+		}
+		previous = index
+	}
+}
+
+// TestValidateSourceFilesAcceptsShippedConfig is a regression guard for the
+// strict check: the config.yaml that ships with the tool must resolve against
+// the configs directory that ships with it, otherwise every default
+// invocation would fail before the first prompt.
+func TestValidateSourceFilesAcceptsShippedConfig(t *testing.T) {
+	configs, err := loadConfig(defaultConfigFile)
+	if err != nil {
+		t.Fatalf("loadConfig() unexpected error: %v", err)
+	}
+
+	if err := validateSourceFiles(configs, defaultConfigDir); err != nil {
+		t.Errorf("validateSourceFiles() unexpected error for the shipped config: %v", err)
 	}
 }
 

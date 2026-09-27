@@ -30,6 +30,14 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Check every referenced source file before the first prompt. Without this
+	// the user only learns about a missing file after the whole interactive flow
+	// has finished, and by then the other files have already been written.
+	if err := validateSourceFiles(configs, opts.configDir); err != nil {
+		pterm.Error.Printfln("%v", err)
+		os.Exit(1)
+	}
+
 	// Create an interactive text input with single line input mode and show it
 	projectPath := promptProjectPath()
 

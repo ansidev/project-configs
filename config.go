@@ -1,7 +1,9 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -95,6 +97,68 @@ func validateConfig(configs map[string]configGroup) error {
 		}
 	}
 	return nil
+}
+
+// validateSourceFiles reports every resource whose source file cannot be read
+// from sourceDir. Every group is checked, not only the groups the user goes on
+// to select, because a config that references a file which is not there is a
+// broken install and is worth reporting before any prompt is answered.
+//
+// Resources with an empty path reference no file and are skipped, which is what
+// action-type resources such as gitflow_init rely on. All problems are reported
+// in one error so the user can fix them in a single pass rather than one run at
+// a time.
+func validateSourceFiles(configs map[string]configGroup, sourceDir string) error {
+	// Group ids are sorted because Go randomises map iteration, and the report
+	// must read the same on every run.
+	groupIDs := make([]string, 0, len(configs))
+	for groupID := range configs {
+		groupIDs = append(groupIDs, groupID)
+	}
+	sort.Strings(groupIDs)
+
+	var problems []string
+	for _, groupID := range groupIDs {
+		for _, resource := range configs[groupID].Resources {
+			if resource.Path == "" {
+				continue
+			}
+
+			srcPath := filepath.Join(sourceDir, resource.Path)
+			if problem := checkSourceFile(srcPath); problem != "" {
+				problems = append(problems, fmt.Sprintf("  - group %q, resource %q: %s", groupID, resource.ID, problem))
+			}
+		}
+	}
+
+	if len(problems) == 0 {
+		return nil
+	}
+
+	return fmt.Errorf("source files referenced in %s are unusable:\n\n%s", defaultConfigFile, strings.Join(problems, "\n"))
+}
+
+// checkSourceFile describes why the given source file cannot be copied, or
+// returns an empty string when it is a readable regular file.
+func checkSourceFile(srcPath string) string {
+	// Stat rather than Lstat, so a symlink pointing at a real file is accepted.
+	info, err := os.Stat(srcPath)
+	if err != nil {
+		// Anything other than an absent path is reported with the underlying
+		// error, so a permission problem is not mislabelled as a missing file.
+		if errors.Is(err, fs.ErrNotExist) {
+			return fmt.Sprintf("%s does not exist", srcPath)
+		}
+		return err.Error()
+	}
+
+	// Stricter than IsDir: copyFile reads the file as bytes, which also fails
+	// for devices and named pipes.
+	if !info.Mode().IsRegular() {
+		return fmt.Sprintf("%s is not a regular file", srcPath)
+	}
+
+	return ""
 }
 
 // getOptionLabels returns the selectable options in a deterministic order,
