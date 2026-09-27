@@ -13,8 +13,6 @@ import (
 	"github.com/pterm/pterm"
 )
 
-const BASE_SOURCE_DIR = "./configs"
-
 type CopyEvent struct {
 	SrcPath     string
 	DestPath    string
@@ -24,13 +22,16 @@ type CopyEvent struct {
 
 // CopyManager holds the state for file copying operations
 type CopyManager struct {
-	copyMu sync.Mutex
+	sourceDir string
+	copyMu    sync.Mutex
 }
 
-// NewCopyManager creates a new CopyManager with initialized fields
-func NewCopyManager() *CopyManager {
+// NewCopyManager creates a new CopyManager that reads source files from the
+// given directory
+func NewCopyManager(sourceDir string) *CopyManager {
 	return &CopyManager{
-		copyMu: sync.Mutex{},
+		sourceDir: sourceDir,
+		copyMu:    sync.Mutex{},
 	}
 }
 
@@ -149,7 +150,7 @@ func (cm *CopyManager) CopyFilesConcurrently(srcFiles []configResource, destDir 
 			}
 
 			// Proceed with copying
-			cm.copyFile(BASE_SOURCE_DIR, src, dst, eventChan)
+			cm.copyFile(cm.sourceDir, src, dst, eventChan)
 		}(src)
 	}
 

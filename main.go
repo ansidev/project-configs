@@ -1,7 +1,6 @@
 package main
 
 import (
-	"flag"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -11,16 +10,20 @@ import (
 
 func main() {
 	// Parse command line flags
-	helpFlag := flag.Bool("help", false, "Display help information")
-	flag.Parse()
+	opts, err := parseOptions(os.Args[1:])
+	if err != nil {
+		pterm.Error.Printfln("Invalid arguments: %v", err)
+		printHelp()
+		os.Exit(1)
+	}
 
 	// Show help if requested
-	if *helpFlag {
+	if opts.help {
 		printHelp()
 		os.Exit(0)
 	}
 
-	configs, err := loadConfig("config.yaml")
+	configs, err := loadConfig(opts.configFile)
 
 	if err != nil {
 		pterm.Error.Printfln("Failed to read config file: %v", err)
@@ -44,7 +47,7 @@ func main() {
 			os.Exit(1)
 		}
 
-		srcPath := filepath.Join(BASE_SOURCE_DIR, fileToCopy.Path)
+		srcPath := filepath.Join(opts.configDir, fileToCopy.Path)
 		pterm.Printfln("- %s → %s.", pterm.Green(srcPath), pterm.Green(dstPath))
 	}
 
@@ -70,7 +73,7 @@ func main() {
 
 	// Copy regular files first
 	if len(regularResources) > 0 {
-		cm := NewCopyManager()
+		cm := NewCopyManager(opts.configDir)
 		err = cm.CopyFilesConcurrently(regularResources, projectPath)
 		if err != nil {
 			pterm.Error.Printfln("Error: %v", err)
@@ -96,12 +99,16 @@ func printHelp() {
 	fmt.Println()
 	fmt.Println("Options:")
 	fmt.Println("  --help		Show this help message")
+	fmt.Println("  -c, --config-file	Path to the config YAML file (default \"" + defaultConfigFile + "\")")
+	fmt.Println("  -d, --config-dir	Path to the directory that contains the source configuration files (default \"" + defaultConfigDir + "\")")
 	fmt.Println()
 	fmt.Println("Interactive mode:")
 	fmt.Println("  The tool will guide you through selecting configuration files")
 	fmt.Println("  and copying them to your project directory.")
 	fmt.Println()
 	fmt.Println("Examples:")
-	fmt.Println("  project-configs		# Start interactive mode")
-	fmt.Println("  project-configs --help	# Show this help message")
+	fmt.Println("  project-configs			# Start interactive mode")
+	fmt.Println("  project-configs --help		# Show this help message")
+	fmt.Println("  project-configs -c ./my-config.yaml	# Read configuration groups from another file")
+	fmt.Println("  project-configs -d ./my-configs	# Copy source files from another directory")
 }

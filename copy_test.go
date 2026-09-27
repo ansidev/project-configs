@@ -39,7 +39,7 @@ func TestCopyFilesConcurrently(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			destDir := t.TempDir()
 
-			cm := NewCopyManager()
+			cm := NewCopyManager(defaultConfigDir)
 			if err := cm.CopyFilesConcurrently([]configResource{tt.meta}, destDir); err != nil {
 				t.Fatalf("CopyFilesConcurrently() unexpected error: %v", err)
 			}
@@ -50,7 +50,7 @@ func TestCopyFilesConcurrently(t *testing.T) {
 				t.Fatalf("CopyFilesConcurrently() did not create %s: %v", destPath, err)
 			}
 
-			source, err := os.ReadFile(filepath.Join(BASE_SOURCE_DIR, tt.meta.Path))
+			source, err := os.ReadFile(filepath.Join(defaultConfigDir, tt.meta.Path))
 			if err != nil {
 				t.Fatalf("failed to read source file: %v", err)
 			}
@@ -72,10 +72,49 @@ func TestCopyFilesConcurrently(t *testing.T) {
 	}
 }
 
+// TestCopyFilesConcurrentlyUsesOverriddenSourceDir verifies that the source
+// directory carried by the CopyManager is the one files are read from, which is
+// what the --config-dir override relies on.
+func TestCopyFilesConcurrentlyUsesOverriddenSourceDir(t *testing.T) {
+	sourceDir := t.TempDir()
+	const fileName = "custom.yaml"
+	wantContent := "custom template content\n"
+	if err := os.WriteFile(filepath.Join(sourceDir, fileName), []byte(wantContent), 0644); err != nil {
+		t.Fatalf("failed to create the custom source file: %v", err)
+	}
+	destDir := t.TempDir()
+
+	cm := NewCopyManager(sourceDir)
+	if err := cm.CopyFilesConcurrently([]configResource{{Path: fileName}}, destDir); err != nil {
+		t.Fatalf("CopyFilesConcurrently() unexpected error: %v", err)
+	}
+
+	copied, err := os.ReadFile(filepath.Join(destDir, fileName))
+	if err != nil {
+		t.Fatalf("CopyFilesConcurrently() did not create %s: %v", fileName, err)
+	}
+	if string(copied) != wantContent {
+		t.Errorf("copied content = %q, want %q", string(copied), wantContent)
+	}
+}
+
+// TestCopyFilesConcurrentlyMissingOverriddenSourceDir verifies that a source
+// file absent from the overridden directory is reported as an error rather than
+// silently skipped.
+func TestCopyFilesConcurrentlyMissingOverriddenSourceDir(t *testing.T) {
+	destDir := t.TempDir()
+
+	cm := NewCopyManager(t.TempDir())
+	err := cm.CopyFilesConcurrently([]configResource{{Path: "not_here.yaml"}}, destDir)
+	if err == nil {
+		t.Fatal("CopyFilesConcurrently() expected error for a missing source file")
+	}
+}
+
 func TestCopyFilesConcurrentlyRejectsInvalidPaths(t *testing.T) {
 	destDir := t.TempDir()
 
-	cm := NewCopyManager()
+	cm := NewCopyManager(defaultConfigDir)
 	err := cm.CopyFilesConcurrently([]configResource{{Path: "MIT_LICENSE", Target: "../escaped"}}, destDir)
 	if err == nil {
 		t.Fatal("CopyFilesConcurrently() expected error for path-traversal target")
@@ -137,7 +176,7 @@ func TestResolveTemplatePlaceholders(t *testing.T) {
 func TestCopyFilesConcurrentlyResolvesCurrentYear(t *testing.T) {
 	destDir := t.TempDir()
 
-	cm := NewCopyManager()
+	cm := NewCopyManager(defaultConfigDir)
 	err := cm.CopyFilesConcurrently([]configResource{{Path: "MIT_LICENSE", Target: "LICENSE"}}, destDir)
 	if err != nil {
 		t.Fatalf("CopyFilesConcurrently() unexpected error: %v", err)
