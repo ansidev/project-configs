@@ -199,6 +199,7 @@ func TestLoadConfig(t *testing.T) {
 		"editorconfig":        ".editorconfig",
 		"renovate_json":       "renovate.json",
 		"mit_license":         "MIT LICENSE",
+		"agpl_v3_license":     "AGPL v3 LICENSE",
 		"github_funding":      "GitHub Funding",
 		"gitflow_init":        "Initialize GitFlow",
 	}
